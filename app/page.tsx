@@ -17,9 +17,10 @@ const TABLE_POSITIONS = [
   [24, 12], [20, 21], [25, 30], [20, 39], [24, 48], [20, 57], [25, 66], [20, 75], [25, 84], [20, 93],
   [76, 12], [80, 21], [75, 30], [80, 39], [76, 48], [80, 57], [75, 66], [80, 75], [75, 84], [80, 93],
 ];
+const ANNEX_TABLE_POSITIONS = [[20, 50], [50, 50], [80, 50]];
 
 function emptyTables(): TableState[] {
-  return Array.from({ length: 20 }, () => ({ capacity: 10, seats: Array(10).fill(null) }));
+  return Array.from({ length: 23 }, () => ({ capacity: 10, seats: Array(10).fill(null) }));
 }
 
 function parseCompactRoster(raw: string): Guest[] {
@@ -71,8 +72,11 @@ export default function Home() {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved) as { guests: Guest[]; tables: TableState[] };
-          if (parsed.guests?.length && parsed.tables?.length === 20) {
-            if (!cancelled) { setGuests(parsed.guests); setTables(parsed.tables); setReady(true); }
+          if (parsed.guests?.length && (parsed.tables?.length === 20 || parsed.tables?.length === 23)) {
+            const migratedTables = parsed.tables.length === 20
+              ? [...parsed.tables, ...emptyTables().slice(20)]
+              : parsed.tables;
+            if (!cancelled) { setGuests(parsed.guests); setTables(migratedTables); setReady(true); }
             return;
           }
         }
@@ -144,10 +148,27 @@ export default function Home() {
     setTables(emptyTables()); setNotice('모든 좌석을 비웠어요.');
   }
 
+  function renderTable(table: TableState, index: number, position: number[]) {
+    const count = table.seats.filter((id) => id !== null).length;
+    const tableTone = index < 10 ? 'bride' : index < 20 ? 'groom' : 'annex';
+    return <div key={index} className={`table-cluster ${tableTone}`} style={{ left: `${position[0]}%`, top: `${position[1]}%` }}>
+      {table.seats.slice(0, table.capacity).map((id, seatIndex) => {
+        const guest = guests.find((person) => person.id === id);
+        const angle = (-90 + seatIndex * 360 / table.capacity) * Math.PI / 180;
+        const x = Math.cos(angle) * 78;
+        const y = Math.sin(angle) * 78;
+        return guest
+          ? <span key={seatIndex} className={`table-seat-name ${guest.side === '신부측' ? 'bride' : 'groom'}`} style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} title={`${seatIndex + 1}번 좌석 · ${guest.name}`}>{guest.name}</span>
+          : <i key={seatIndex} className="empty-seat-dot" style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} />;
+      })}
+      <button className={`round-table ${selected === index ? 'selected' : ''} ${count === table.capacity ? 'full' : ''}`} onClick={() => { setSelected(index); setNotice(`${index + 1}번 테이블을 선택했어요. 이름을 눌러 배정하세요.`); }} aria-pressed={selected === index} aria-label={`${index + 1}번 테이블, ${count}명 배정`}><b>{index + 1}</b><small>{count} / {table.capacity}</small></button>
+    </div>;
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="맨 위로"><span className="brand-dot" /><strong>준영 유정 결혼식 자리 배치도</strong></a>
+        <a className="brand" href="#top" aria-label="맨 위로"><img className="brand-logo" src="/logo-ngrl.png" alt="너굴릴라 로고" /><strong>너굴릴라 웨딩 자리배치도</strong></a>
         <div className="top-actions"><button className="ghost-button" onClick={resetSeating}>배정 초기화</button><button className="primary-button" onClick={() => setPasteOpen(true)}>명단 붙여넣기</button></div>
       </header>
 
@@ -158,27 +179,23 @@ export default function Home() {
       <p className="notice" role="status"><span>●</span>{notice}</p>
       <section className="workspace">
         <div className="floor-card card">
-          <div className="card-heading"><div><h2>웨딩홀 배치도</h2><p>원탁 20개 · 테이블당 8–10석</p></div><span className="selected-legend"><i /> 선택한 테이블</span></div>
-          <div className="hall-wrap"><div className="hall">
-            <div className="stage"><b>STAGE</b><span>신랑 · 신부</span></div><span className="side-label bride-label">신부측</span><span className="side-label groom-label">신랑측</span><div className="virgin-road"><span>VIRGIN ROAD</span></div>
-            {tables.map((table, index) => {
-              const count = table.seats.filter((id) => id !== null).length;
-              const isBride = index < 10;
-              return <div key={index} className={`table-cluster ${isBride ? 'bride' : 'groom'}`} style={{ left: `${TABLE_POSITIONS[index][0]}%`, top: `${TABLE_POSITIONS[index][1]}%` }}>
-                {table.seats.slice(0, table.capacity).map((id, seatIndex) => {
-                  const guest = guests.find((person) => person.id === id);
-                  const angle = (-90 + seatIndex * 360 / table.capacity) * Math.PI / 180;
-                  const x = Math.cos(angle) * 78;
-                  const y = Math.sin(angle) * 78;
-                  return guest
-                    ? <span key={seatIndex} className={`table-seat-name ${guest.side === '신부측' ? 'bride' : 'groom'}`} style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} title={`${seatIndex + 1}번 좌석 · ${guest.name}`}>{guest.name}</span>
-                    : <i key={seatIndex} className="empty-seat-dot" style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} />;
-                })}
-                <button className={`round-table ${selected === index ? 'selected' : ''} ${count === table.capacity ? 'full' : ''}`} onClick={() => { setSelected(index); setNotice(`${index + 1}번 테이블을 선택했어요. 이름을 눌러 배정하세요.`); }} aria-pressed={selected === index} aria-label={`${index + 1}번 테이블, ${count}명 배정`}><b>{index + 1}</b><small>{count} / {table.capacity}</small></button>
-              </div>;
-            })}
-            <span className="entrance">↖ ENTRANCE</span>
-          </div></div>
+          <div className="card-heading"><div><h2>웨딩홀 배치도</h2><p>메인 홀 20개 · 별도 홀 3개 · 테이블당 8–10석</p></div><span className="selected-legend"><i /> 선택한 테이블</span></div>
+          <div className="hall-wrap">
+            <div className="hall main-hall">
+              <div className="stage"><b>STAGE</b><span>신랑 · 신부</span></div>
+              <span className="mascot-label bride-mascot"><b>🦝</b><small>신부측</small></span>
+              <span className="mascot-label groom-mascot"><b>🦍</b><small>신랑측</small></span>
+              <div className="virgin-road"><span>VIRGIN ROAD</span></div>
+              {tables.slice(0, 20).map((table, index) => renderTable(table, index, TABLE_POSITIONS[index]))}
+              <span className="entrance">↖ ENTRANCE</span>
+            </div>
+            <section className="annex-section" aria-label="별도 홀">
+              <div className="annex-heading"><h3>별도 홀</h3><span>21–23번 테이블</span></div>
+              <div className="annex-hall">
+                {tables.slice(20, 23).map((table, offset) => renderTable(table, offset + 20, ANNEX_TABLE_POSITIONS[offset]))}
+              </div>
+            </section>
+          </div>
         </div>
 
         <aside className="guest-card card">
