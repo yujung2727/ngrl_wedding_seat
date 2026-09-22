@@ -98,6 +98,19 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 .capacity-picker { display:flex; padding:3px; border-radius:9px; background:#efedeb; }
 .capacity-picker button { width:35px; height:31px; border-radius:7px; background:transparent; color:#777471; font-size:12px; font-weight:700; }
 .capacity-picker button.active { background:#fff; color:var(--bride); font-weight:800; box-shadow:0 2px 8px rgba(45,40,38,.1); }
+.selected-guests { margin-top:16px; padding:13px; border:1px solid #e2dedb; border-radius:12px; background:#f8f6f4; }
+.selected-guests-head { margin-bottom:9px; display:flex; align-items:center; justify-content:space-between; gap:12px; color:#797572; font-size:10px; font-weight:800; }
+.selected-guests-head strong { color:var(--ink); font-size:11px; }
+.selected-guests-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+.selected-guests-list button { min-width:0; min-height:42px; padding:6px 8px; display:flex; align-items:center; justify-content:space-between; gap:7px; border:1px solid #e1d6d9; border-radius:9px; background:#fff; text-align:left; }
+.selected-guests-list button:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(45,39,37,.07); }
+.selected-guests-list button>span { min-width:0; display:flex; align-items:center; gap:7px; }
+.selected-guests-list i { width:25px; height:25px; flex:0 0 25px; display:grid; place-items:center; border-radius:50%; background:var(--bride-soft); color:var(--bride); font-size:10px; font-style:normal; font-weight:800; }
+.selected-guests-list b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+.selected-guests-list em { flex:0 0 auto; color:var(--bride); font-size:9px; font-style:normal; font-weight:800; }
+.selected-guests-list button.groom { border-color:#dadcde; }
+.selected-guests-list button.groom i { background:var(--groom-soft); color:var(--groom); }
+.selected-guests-list button.groom em { color:var(--groom); }
 .list-title { margin-top:18px; padding-top:18px; display:flex; justify-content:space-between; align-items:flex-start; gap:15px; border-top:1px solid #efedeb; }
 .list-title strong { padding:7px 10px; border-radius:999px; background:#f1efed; color:var(--ink); font-size:11px; white-space:nowrap; }
 .search-box { height:42px; margin-top:14px; padding:0 13px; display:flex; align-items:center; gap:8px; border:1px solid #d1cdca; border-radius:9px; background:#fff; }
@@ -140,5 +153,5 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
   .brand-logo { width:48px; height:38px; flex-basis:48px; } .brand strong { max-width:150px; font-size:13px; } .top-actions .primary-button { padding:0 10px; font-size:10px; }
   .summary { grid-template-columns:repeat(2,1fr); } .summary>div:nth-child(2) { border-right:0; } .summary>div:nth-child(-n+2) { border-bottom:1px solid var(--line); }
   .card-heading { align-items:flex-start; flex-direction:column; } .hall-tabs { width:100%; } .hall-tabs button { flex:1; }
-  .guest-sticky { padding:19px 14px 12px; } .paste-modal { padding:25px 18px 20px; }
+  .guest-sticky { padding:19px 14px 12px; } .selected-guests-list { grid-template-columns:1fr; } .paste-modal { padding:25px 18px 20px; }
 }

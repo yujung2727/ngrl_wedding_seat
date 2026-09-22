@@ -217,6 +217,10 @@ export default function Home() {
   }), [assignments, groupFilter, guests, query, sideFilter]);
 
   const selectedTable = tables[selected];
+  const selectedTableGuests = useMemo(() => selectedTable.seats
+    .slice(0, selectedTable.capacity)
+    .map((id) => guests.find((guest) => guest.id === id))
+    .filter((guest): guest is Guest => Boolean(guest)), [guests, selectedTable]);
 
   function chooseGuest(guest: Guest) {
     const current = assignments.get(guest.id);
@@ -318,6 +322,7 @@ export default function Home() {
         <aside className="guest-card card">
           <div className="guest-sticky">
             <div className="table-editor-head"><div><span className="section-label">선택한 테이블</span><h2>{String(selected + 1).padStart(2, '0')}번 테이블</h2></div><div className="capacity-picker" aria-label="테이블 좌석 수">{([8, 9, 10] as const).map((capacity) => <button key={capacity} className={selectedTable.capacity === capacity ? 'active' : ''} onClick={() => setCapacity(capacity)}>{capacity}</button>)}</div></div>
+            {selectedTableGuests.length > 0 && <section className="selected-guests" aria-label={`${selected + 1}번 테이블 배정 하객`}><div className="selected-guests-head"><span>이 테이블에 배정된 하객</span><strong>{selectedTableGuests.length}명</strong></div><div className="selected-guests-list">{selectedTableGuests.map((guest) => <button key={guest.id} className={guest.side === '신랑측' ? 'groom' : 'bride'} onClick={() => chooseGuest(guest)} title={`${guest.name} 님 배정 해제`}><span><i>{guest.name.slice(0, 1)}</i><b>{guest.name}</b></span><em>빼기 ×</em></button>)}</div></section>}
             <div className="list-title"><div><h2>전체 하객 명단</h2><p>이름을 누르면 선택한 테이블에 바로 배정됩니다.</p></div><strong>{visibleGuests.length}명</strong></div>
             <label className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 관계 검색" aria-label="하객 검색" /></label>
             <div className="filters">{(['전체', '신부측', '신랑측', '미배정'] as SideFilter[]).map((filter) => <button key={filter} className={sideFilter === filter ? 'active' : ''} onClick={() => setSideFilter(filter)}>{filter}</button>)}<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} aria-label="관계 그룹 필터">{groups.map((group) => <option key={group}>{group}</option>)}</select></div>
