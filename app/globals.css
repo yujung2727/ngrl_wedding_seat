@@ -81,6 +81,7 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 .table-seat-name { position:absolute; width:62px; min-height:18px; padding:3px 4px; transform:translate(-50%,-50%); border-radius:999px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; font-size:9px; font-weight:800; line-height:12px; z-index:5; }
 .table-seat-name.bride { background:var(--bride); color:#fff; box-shadow:0 2px 7px rgba(120,38,61,.16); }
 .table-seat-name.groom { background:var(--groom); color:#fff; box-shadow:0 2px 7px rgba(63,69,74,.16); }
+.table-seat-name:hover,.table-seat-name:focus-visible { transform:translate(-50%,-50%) scale(1.08); outline:2px solid #fff; outline-offset:1px; }
 .empty-seat-dot { position:absolute; width:6px; height:6px; transform:translate(-50%,-50%); border-radius:50%; background:#d8d4d0; z-index:2; }
 .entrance { position:absolute; bottom:34px; right:26px; color:#817d7a; font-size:11px; font-weight:700; letter-spacing:.13em; }
 .annex-section { width:540px; min-width:540px; margin:40px auto 4px; }
@@ -96,19 +97,6 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 .capacity-picker { display:flex; padding:3px; border-radius:9px; background:#efedeb; }
 .capacity-picker button { width:35px; height:31px; border-radius:7px; background:transparent; color:#777471; font-size:12px; font-weight:700; }
 .capacity-picker button.active { background:#fff; color:var(--bride); font-weight:800; box-shadow:0 2px 8px rgba(45,40,38,.1); }
-.selected-guests { margin-top:16px; padding:13px; border:1px solid #e2dedb; border-radius:12px; background:#f8f6f4; }
-.selected-guests-head { margin-bottom:9px; display:flex; align-items:center; justify-content:space-between; gap:12px; color:#797572; font-size:10px; font-weight:800; }
-.selected-guests-head strong { color:var(--ink); font-size:11px; }
-.selected-guests-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
-.selected-guests-list button { min-width:0; min-height:42px; padding:6px 8px; display:flex; align-items:center; justify-content:space-between; gap:7px; border:1px solid #e1d6d9; border-radius:9px; background:#fff; text-align:left; }
-.selected-guests-list button:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(45,39,37,.07); }
-.selected-guests-list button>span { min-width:0; display:flex; align-items:center; gap:7px; }
-.selected-guests-list i { width:25px; height:25px; flex:0 0 25px; display:grid; place-items:center; border-radius:50%; background:var(--bride-soft); color:var(--bride); font-size:10px; font-style:normal; font-weight:800; }
-.selected-guests-list b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
-.selected-guests-list em { flex:0 0 auto; color:var(--bride); font-size:9px; font-style:normal; font-weight:800; }
-.selected-guests-list button.groom { border-color:#dadcde; }
-.selected-guests-list button.groom i { background:var(--groom-soft); color:var(--groom); }
-.selected-guests-list button.groom em { color:var(--groom); }
 .list-title { margin-top:18px; padding-top:18px; display:flex; justify-content:space-between; align-items:flex-start; gap:15px; border-top:1px solid #efedeb; }
 .list-title strong { padding:7px 10px; border-radius:999px; background:#f1efed; color:var(--ink); font-size:11px; white-space:nowrap; }
 .search-box { height:42px; margin-top:14px; padding:0 13px; display:flex; align-items:center; gap:8px; border:1px solid #d1cdca; border-radius:9px; background:#fff; }
@@ -138,6 +126,18 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 .paste-modal textarea:focus { border-color:var(--bride); box-shadow:0 0 0 3px var(--bride-soft); }
 .modal-close { position:absolute; top:17px; right:18px; width:36px; height:36px; border-radius:50%; background:#f1efed; font-size:22px; }
 .modal-actions { margin-top:16px; display:flex; justify-content:flex-end; gap:8px; }
+.assignment-modal { width:min(430px,100%); padding:31px; position:relative; border-radius:18px; background:#fff; text-align:center; box-shadow:0 30px 100px rgba(20,17,18,.25); }
+.assignment-avatar { width:48px; height:48px; margin:0 auto 10px; display:grid; place-items:center; border-radius:50%; background:var(--bride-soft); color:var(--bride); font-size:16px; font-weight:800; }
+.assignment-avatar.groom { background:var(--groom-soft); color:var(--groom); }
+.assignment-modal h2 { margin-bottom:5px; font-size:23px; }
+.assignment-modal>p { margin:0; color:var(--muted); font-size:12px; }
+.assignment-modal label { margin-top:22px; display:block; text-align:left; }
+.assignment-modal label>span { display:block; margin-bottom:7px; color:#6f6b68; font-size:11px; font-weight:800; }
+.assignment-modal select { width:100%; height:46px; padding:0 12px; border:1px solid #d1cdca; border-radius:9px; background:#fff; color:var(--ink); outline:0; font-size:13px; }
+.assignment-actions { margin-top:17px; display:grid; grid-template-columns:.8fr 1.2fr; gap:8px; }
+.assignment-actions button { min-height:44px; border-radius:9px; font-size:12px; font-weight:800; }
+.remove-button { border:1px solid #e3ccd3; background:#fff5f7; color:var(--bride); }
+.remove-button:hover { background:var(--bride-soft); }
 
 @media (max-width:1540px) { .summary,.notice,.workspace { margin-left:clamp(18px,3vw,45px); margin-right:clamp(18px,3vw,45px); } }
 @media (max-width:1120px) { .workspace { grid-template-columns:minmax(560px,.9fr) minmax(430px,1.1fr); } }
@@ -151,5 +151,5 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
   .brand-logo { width:48px; height:38px; flex-basis:48px; } .brand strong { max-width:150px; font-size:13px; } .top-actions .primary-button { padding:0 10px; font-size:10px; }
   .summary { grid-template-columns:repeat(2,1fr); } .summary>div:nth-child(2) { border-right:0; } .summary>div:nth-child(-n+2) { border-bottom:1px solid var(--line); }
   .card-heading { align-items:flex-start; flex-direction:column; } .hall-tabs { width:100%; } .hall-tabs button { flex:1; }
-  .guest-sticky { padding:19px 14px 12px; } .selected-guests-list { grid-template-columns:1fr; } .paste-modal { padding:25px 18px 20px; }
+  .guest-sticky { padding:19px 14px 12px; } .paste-modal,.assignment-modal { padding:25px 18px 20px; }
 }

@@ -90,6 +90,8 @@ export default function Home() {
   const [groupFilter, setGroupFilter] = useState('전체 그룹');
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
+  const [editingGuestId, setEditingGuestId] = useState<number | null>(null);
+  const [moveTarget, setMoveTarget] = useState(0);
   const [hallSide, setHallSide] = useState<HallSide>('bride');
   const [notice, setNotice] = useState('테이블을 고르고 이름을 누르면 바로 배정돼요.');
   const [ready, setReady] = useState(false);
@@ -218,13 +220,11 @@ export default function Home() {
     const matchesGroup = groupFilter === '전체 그룹' || guest.group === groupFilter;
     const haystack = `${guest.name} ${guest.side} ${guest.group}`.toLowerCase();
     return matchesSide && matchesGroup && haystack.includes(query.trim().toLowerCase());
-  }), [assignments, groupFilter, guests, query, sideFilter]);
+  }).sort((a, b) => Number(assignments.has(a.id)) - Number(assignments.has(b.id))), [assignments, groupFilter, guests, query, sideFilter]);
 
   const selectedTable = tables[selected];
-  const selectedTableGuests = useMemo(() => selectedTable.seats
-    .slice(0, selectedTable.capacity)
-    .map((id) => guests.find((guest) => guest.id === id))
-    .filter((guest): guest is Guest => Boolean(guest)), [guests, selectedTable]);
+  const editingGuest = editingGuestId === null ? null : guests.find((guest) => guest.id === editingGuestId) ?? null;
+  const editingAssignment = editingGuest ? assignments.get(editingGuest.id) : undefined;
 
   function chooseGuest(guest: Guest) {
     const current = assignments.get(guest.id);
@@ -242,6 +242,39 @@ export default function Home() {
       setNotice(`${guest.name} 님을 ${selected + 1}번 테이블 ${openSeat + 1}번 좌석에 배정했어요.`);
       return next;
     });
+  }
+
+  function openAssignmentEditor(guest: Guest, tableIndex: number) {
+    setSelected(tableIndex);
+    setEditingGuestId(guest.id);
+    setMoveTarget(tableIndex);
+  }
+
+  function removeEditingGuest() {
+    if (!editingGuest || !editingAssignment) return;
+    setTables((previous) => previous.map((table, tableIndex) => ({
+      ...table,
+      seats: table.seats.map((id) => tableIndex === editingAssignment.table && id === editingGuest.id ? null : id),
+    })));
+    setNotice(`${editingGuest.name} 님의 ${editingAssignment.table + 1}번 테이블 배정을 해제했어요.`);
+    setEditingGuestId(null);
+  }
+
+  function moveEditingGuest() {
+    if (!editingGuest || !editingAssignment || moveTarget === editingAssignment.table) return;
+    const next = tables.map((table) => ({ ...table, seats: [...table.seats] }));
+    const openSeat = next[moveTarget].seats.slice(0, next[moveTarget].capacity).findIndex((id) => id === null);
+    if (openSeat < 0) {
+      setNotice(`${moveTarget + 1}번 테이블이 가득 찼어요.`);
+      return;
+    }
+    next[editingAssignment.table].seats[editingAssignment.seat] = null;
+    next[moveTarget].seats[openSeat] = editingGuest.id;
+    setTables(next);
+    setSelected(moveTarget);
+    setHallSide(moveTarget < 10 || moveTarget >= 20 ? 'bride' : 'groom');
+    setNotice(`${editingGuest.name} 님을 ${moveTarget + 1}번 테이블로 옮겼어요.`);
+    setEditingGuestId(null);
   }
 
   function setCapacity(capacity: 8 | 9 | 10) {
@@ -281,7 +314,7 @@ export default function Home() {
         const x = Math.cos(angle) * 78;
         const y = Math.sin(angle) * 78;
         return guest
-          ? <span key={seatIndex} className={`table-seat-name ${guest.side === '신부측' ? 'bride' : 'groom'}`} style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} title={`${seatIndex + 1}번 좌석 · ${guest.name}`}>{guest.name}</span>
+          ? <button key={seatIndex} className={`table-seat-name ${guest.side === '신부측' ? 'bride' : 'groom'}`} style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} title={`${guest.name} 님 자리 변경 또는 배정 해제`} onClick={() => openAssignmentEditor(guest, index)}>{guest.name}</button>
           : <i key={seatIndex} className="empty-seat-dot" style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} />;
       })}
       <button className={`round-table ${selected === index ? 'selected' : ''} ${count === table.capacity ? 'full' : ''}`} onClick={() => { setSelected(index); setNotice(`${index + 1}번 테이블을 선택했어요. 이름을 눌러 배정하세요.`); }} aria-pressed={selected === index} aria-label={`${index + 1}번 테이블, ${count}명 배정`}><b>{index + 1}</b><small>{count} / {table.capacity}</small></button>
@@ -326,7 +359,6 @@ export default function Home() {
         <aside className="guest-card card">
           <div className="guest-sticky">
             <div className="table-editor-head"><div><span className="section-label">선택한 테이블</span><h2>{String(selected + 1).padStart(2, '0')}번 테이블</h2></div><div className="capacity-picker" aria-label="테이블 좌석 수">{([8, 9, 10] as const).map((capacity) => <button key={capacity} className={selectedTable.capacity === capacity ? 'active' : ''} onClick={() => setCapacity(capacity)}>{capacity}</button>)}</div></div>
-            {selectedTableGuests.length > 0 && <section className="selected-guests" aria-label={`${selected + 1}번 테이블 배정 하객`}><div className="selected-guests-head"><span>이 테이블에 배정된 하객</span><strong>{selectedTableGuests.length}명</strong></div><div className="selected-guests-list">{selectedTableGuests.map((guest) => <button key={guest.id} className={guest.side === '신랑측' ? 'groom' : 'bride'} onClick={() => chooseGuest(guest)} title={`${guest.name} 님 배정 해제`}><span><i>{guest.name.slice(0, 1)}</i><b>{guest.name}</b></span><em>빼기 ×</em></button>)}</div></section>}
             <div className="list-title"><div><h2>전체 하객 명단</h2><p>이름을 누르면 선택한 테이블에 바로 배정됩니다.</p></div><strong>{visibleGuests.length}명</strong></div>
             <label className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 관계 검색" aria-label="하객 검색" /></label>
             <div className="filters">{(['전체', '신부측', '신랑측', '미배정'] as SideFilter[]).map((filter) => <button key={filter} className={sideFilter === filter ? 'active' : ''} onClick={() => setSideFilter(filter)}>{filter}</button>)}<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} aria-label="관계 그룹 필터">{groups.map((group) => <option key={group}>{group}</option>)}</select></div>
@@ -338,6 +370,7 @@ export default function Home() {
         </aside>
       </section>
 
+      {editingGuest && editingAssignment && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setEditingGuestId(null)}><section className="assignment-modal" role="dialog" aria-modal="true" aria-labelledby="assignment-title"><button className="modal-close" onClick={() => setEditingGuestId(null)} aria-label="닫기">×</button><span className={`assignment-avatar ${editingGuest.side === '신랑측' ? 'groom' : ''}`}>{editingGuest.name.slice(0, 1)}</span><h2 id="assignment-title">{editingGuest.name}</h2><p>현재 {editingAssignment.table + 1}번 테이블 · {editingAssignment.seat + 1}번 좌석</p><label><span>다른 테이블로 이동</span><select value={moveTarget} onChange={(event) => setMoveTarget(Number(event.target.value))}>{tables.map((table, index) => <option key={index} value={index}>{index + 1}번 테이블 · {table.seats.filter((id) => id !== null).length}/{table.capacity}명</option>)}</select></label><div className="assignment-actions"><button className="remove-button" onClick={removeEditingGuest}>배정 해제</button><button className="primary-button" onClick={moveEditingGuest} disabled={moveTarget === editingAssignment.table}>선택한 테이블로 이동</button></div></section></div>}
       {pasteOpen && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setPasteOpen(false)}><section className="paste-modal" role="dialog" aria-modal="true" aria-labelledby="paste-title"><button className="modal-close" onClick={() => setPasteOpen(false)} aria-label="닫기">×</button><h2 id="paste-title">표를 그대로 붙여넣으세요</h2><p>엑셀이나 구글 시트의 ‘이름 · 구분’ 열을 복사해서 아래 칸에 붙여넣으면 됩니다.</p><textarea value={pasteText} onChange={(event) => setPasteText(event.target.value)} placeholder={'이름\t구분\n홍길동\t신부측 / 친구\n김하나\t신랑측 / 회사 동료'} autoFocus /><div className="modal-actions"><button className="ghost-button" onClick={() => setPasteOpen(false)}>취소</button><button className="primary-button" onClick={applyPastedRoster} disabled={!pasteText.trim()}>새 명단 적용</button></div></section></div>}
     </main>
   );
