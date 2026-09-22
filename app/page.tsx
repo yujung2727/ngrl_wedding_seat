@@ -6,6 +6,7 @@ type Guest = { id: number; name: string; side: '신부측' | '신랑측'; group:
 type TableState = { capacity: 8 | 9 | 10; seats: Array<number | null> };
 type SideFilter = '전체' | '신부측' | '신랑측' | '미배정';
 type SharedState = { guests: Guest[]; tables: TableState[] };
+type HallSide = 'bride' | 'groom';
 
 const STORAGE_KEY = 'our-seats-v1';
 const GROUPS = [
@@ -14,9 +15,9 @@ const GROUPS = [
   '친척', '친구', '직계', '외가', '친가', '동기', '룸메',
 ];
 
-const TABLE_POSITIONS = [
-  [24, 12], [20, 21], [25, 30], [20, 39], [24, 48], [20, 57], [25, 66], [20, 75], [25, 84], [20, 93],
-  [76, 12], [80, 21], [75, 30], [80, 39], [76, 48], [80, 57], [75, 66], [80, 75], [75, 84], [80, 93],
+const SIDE_TABLE_POSITIONS = [
+  [24, 20], [76, 20], [24, 36], [76, 36], [24, 52],
+  [76, 52], [24, 68], [76, 68], [24, 84], [76, 84],
 ];
 const ANNEX_TABLE_POSITIONS = [[20, 50], [50, 50], [80, 50]];
 
@@ -85,6 +86,7 @@ export default function Home() {
   const [groupFilter, setGroupFilter] = useState('전체 그룹');
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
+  const [hallSide, setHallSide] = useState<HallSide>('bride');
   const [notice, setNotice] = useState('테이블을 고르고 이름을 누르면 바로 배정돼요.');
   const [ready, setReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState('공동 배치를 불러오는 중…');
@@ -239,6 +241,15 @@ export default function Home() {
     setTables((previous) => previous.map((table, index) => index === selected ? { ...table, capacity } : table));
   }
 
+  function switchHall(next: HallSide) {
+    setHallSide(next);
+    if (next === 'bride' && selected >= 10 && selected < 20) setSelected(0);
+    if (next === 'groom' && (selected < 10 || selected >= 20)) setSelected(10);
+    setNotice(next === 'bride'
+      ? '신부측 1–10번 테이블과 별도 홀 21–23번을 보고 있어요.'
+      : '신랑측 11–20번 테이블을 보고 있어요.');
+  }
+
   function applyPastedRoster() {
     try {
       const nextGuests = parsePastedRoster(pasteText);
@@ -283,29 +294,30 @@ export default function Home() {
       <p className="notice" role="status"><span>●</span>{notice}</p>
       <section className="workspace">
         <div className="floor-card card">
-          <div className="card-heading"><div><h2>웨딩홀 배치도</h2><p>메인 홀 20개 · 별도 홀 3개 · 테이블당 8–10석</p></div><span className="selected-legend"><i /> 선택한 테이블</span></div>
+          <div className="card-heading"><div><h2>웨딩홀 배치도</h2><p>{hallSide === 'bride' ? '신부측 1–10번 · 별도 홀 21–23번' : '신랑측 11–20번'} · 테이블당 8–10석</p></div><div className="hall-tabs" role="tablist" aria-label="홀 구역 선택"><button role="tab" aria-selected={hallSide === 'bride'} className={hallSide === 'bride' ? 'active bride' : ''} onClick={() => switchHall('bride')}>🦝 신부측</button><button role="tab" aria-selected={hallSide === 'groom'} className={hallSide === 'groom' ? 'active groom' : ''} onClick={() => switchHall('groom')}>🦍 신랑측</button></div></div>
           <div className="hall-wrap">
-            <div className="hall main-hall">
-              <div className="stage"><b>STAGE</b><span>신랑 · 신부</span></div>
-              <span className="mascot-label bride-mascot"><b>🦝</b><small>신부측</small></span>
-              <span className="mascot-label groom-mascot"><b>🦍</b><small>신랑측</small></span>
+            <div className={`hall side-hall ${hallSide}`}>
+              <div className="stage"><b>STAGE</b><span>{hallSide === 'bride' ? '신부측 · 1–10번' : '신랑측 · 11–20번'}</span></div>
+              <span className={`mascot-label side-mascot ${hallSide === 'bride' ? 'bride-mascot' : 'groom-mascot'}`}><b>{hallSide === 'bride' ? '🦝' : '🦍'}</b><small>{hallSide === 'bride' ? '신부측' : '신랑측'}</small></span>
               <div className="virgin-road"><span>VIRGIN ROAD</span></div>
-              {tables.slice(0, 20).map((table, index) => renderTable(table, index, TABLE_POSITIONS[index]))}
+              {(hallSide === 'bride' ? tables.slice(0, 10) : tables.slice(10, 20)).map((table, offset) => {
+                const index = hallSide === 'bride' ? offset : offset + 10;
+                return renderTable(table, index, SIDE_TABLE_POSITIONS[offset]);
+              })}
               <span className="entrance">↖ ENTRANCE</span>
             </div>
-            <section className="annex-section" aria-label="별도 홀">
+            {hallSide === 'bride' && <section className="annex-section" aria-label="별도 홀">
               <div className="annex-heading"><h3>별도 홀</h3><span>21–23번 테이블</span></div>
               <div className="annex-hall">
                 {tables.slice(20, 23).map((table, offset) => renderTable(table, offset + 20, ANNEX_TABLE_POSITIONS[offset]))}
               </div>
-            </section>
+            </section>}
           </div>
         </div>
 
         <aside className="guest-card card">
           <div className="guest-sticky">
             <div className="table-editor-head"><div><span className="section-label">선택한 테이블</span><h2>{String(selected + 1).padStart(2, '0')}번 테이블</h2></div><div className="capacity-picker" aria-label="테이블 좌석 수">{([8, 9, 10] as const).map((capacity) => <button key={capacity} className={selectedTable.capacity === capacity ? 'active' : ''} onClick={() => setCapacity(capacity)}>{capacity}</button>)}</div></div>
-            <div className="seat-strip">{selectedTable.seats.slice(0, selectedTable.capacity).map((id, index) => { const guest = guests.find((person) => person.id === id); return <button key={index} className={guest ? 'occupied' : ''} onClick={() => guest && chooseGuest(guest)} title={guest ? '눌러서 배정 해제' : '빈 좌석'}><small>{index + 1}</small><span>{guest?.name || '빈자리'}</span></button>; })}</div>
             <div className="list-title"><div><h2>전체 하객 명단</h2><p>이름을 누르면 선택한 테이블에 바로 배정됩니다.</p></div><strong>{visibleGuests.length}명</strong></div>
             <label className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 관계 검색" aria-label="하객 검색" /></label>
             <div className="filters">{(['전체', '신부측', '신랑측', '미배정'] as SideFilter[]).map((filter) => <button key={filter} className={sideFilter === filter ? 'active' : ''} onClick={() => setSideFilter(filter)}>{filter}</button>)}<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} aria-label="관계 그룹 필터">{groups.map((group) => <option key={group}>{group}</option>)}</select></div>
