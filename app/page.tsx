@@ -15,9 +15,13 @@ const GROUPS = [
   '친척', '친구', '직계', '외가', '친가', '동기', '룸메',
 ];
 
-const SIDE_TABLE_POSITIONS = [
-  [24, 20], [76, 20], [24, 36], [76, 36], [24, 52],
-  [76, 52], [24, 68], [76, 68], [24, 84], [76, 84],
+const BRIDE_TABLE_POSITIONS = [
+  [58, 14], [42, 22], [60, 30], [40, 38], [58, 46],
+  [38, 54], [57, 62], [40, 70], [62, 78], [53, 86],
+];
+const GROOM_TABLE_POSITIONS = [
+  [42, 14], [58, 22], [40, 30], [60, 38], [42, 46],
+  [62, 54], [43, 62], [60, 70], [45, 78], [58, 86],
 ];
 const ANNEX_TABLE_POSITIONS = [[20, 50], [50, 50], [80, 50]];
 
@@ -303,10 +307,10 @@ export default function Home() {
             <div className={`hall side-hall ${hallSide}`}>
               <div className="stage"><b>STAGE</b><span>{hallSide === 'bride' ? '신부측 · 1–10번' : '신랑측 · 11–20번'}</span></div>
               <span className={`mascot-label side-mascot ${hallSide === 'bride' ? 'bride-mascot' : 'groom-mascot'}`}><b>{hallSide === 'bride' ? '🦝' : '🦍'}</b><small>{hallSide === 'bride' ? '신부측' : '신랑측'}</small></span>
-              <div className="virgin-road"><span>VIRGIN ROAD</span></div>
               {(hallSide === 'bride' ? tables.slice(0, 10) : tables.slice(10, 20)).map((table, offset) => {
                 const index = hallSide === 'bride' ? offset : offset + 10;
-                return renderTable(table, index, SIDE_TABLE_POSITIONS[offset]);
+                const position = hallSide === 'bride' ? BRIDE_TABLE_POSITIONS[offset] : GROOM_TABLE_POSITIONS[offset];
+                return renderTable(table, index, position);
               })}
               <span className="entrance">↖ ENTRANCE</span>
             </div>

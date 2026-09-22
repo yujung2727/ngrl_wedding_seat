@@ -51,7 +51,7 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 .hall-tabs button.active.bride { color:var(--bride); }
 .hall-tabs button.active.groom { color:var(--groom-dark); }
 .hall-wrap { padding:22px 26px; overflow-x:auto; background-color:#f7f5f3; background-image:radial-gradient(#d7d2ce .75px,transparent .75px); background-size:15px 15px; }
-.hall { width:540px; min-width:540px; height:1100px; margin:auto; border:2px solid #d4d0cc; border-radius:8px 8px 115px 115px; position:relative; background:rgba(255,255,255,.82); }
+.hall { width:540px; min-width:540px; height:1600px; margin:auto; border:2px solid #d4d0cc; border-radius:8px 8px 115px 115px; position:relative; background:rgba(255,255,255,.82); }
 .hall.bride { border-color:#d8c0c9; }
 .hall.groom { border-color:#c8cbcd; }
 .stage { position:absolute; top:22px; left:20%; width:60%; height:74px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f0eeec; border:1px solid #d7d2ce; z-index:2; }
@@ -60,11 +60,9 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 .mascot-label { position:absolute; top:110px; z-index:3; display:flex; align-items:center; gap:7px; padding:5px 9px 5px 6px; border-radius:999px; background:#fff; box-shadow:0 4px 14px rgba(45,39,37,.08); }
 .mascot-label b { font-size:22px; line-height:1; }
 .mascot-label small { font-size:11px; font-weight:800; }
-.side-mascot { left:50%; transform:translateX(-50%); }
+.side-mascot { left:10%; }
 .bride-mascot { color:var(--bride); border:1px solid #ead4dc; }
 .groom-mascot { color:var(--groom); border:1px solid #d9dddf; }
-.virgin-road { position:absolute; top:96px; bottom:140px; left:46%; width:8%; display:flex; align-items:center; justify-content:center; background:#f1efed; border:1px solid #ded9d5; }
-.virgin-road span { writing-mode:vertical-rl; color:#aaa4a0; font-size:10px; font-weight:700; letter-spacing:.5em; }
 .table-cluster { position:absolute; width:200px; height:200px; transform:translate(-50%,-50%); z-index:4; }
 .round-table { position:absolute; left:50%; top:50%; width:72px; height:72px; transform:translate(-50%,-50%); border-radius:50%; border:2px solid; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:.16s ease; z-index:3; }
 .table-cluster.bride .round-table { border-color:#cfaebb; box-shadow:0 4px 0 #eddee4; }
