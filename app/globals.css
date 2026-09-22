@@ -23,6 +23,8 @@ button { color:inherit; border:0; cursor:pointer; }
 .brand-logo { width:70px; height:50px; flex:0 0 70px; object-fit:contain; }
 .brand strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 .top-actions { display:flex; flex:0 0 auto; gap:8px; }
+.sync-status { min-height:42px; padding:0 12px; display:flex; align-items:center; gap:7px; color:#686b6d; font-size:11px; font-weight:700; white-space:nowrap; }
+.sync-status i { width:7px; height:7px; border-radius:50%; background:#6a8b71; box-shadow:0 0 0 3px #e8f0e9; }
 .ghost-button,.primary-button { min-height:42px; padding:0 17px; border-radius:9px; font-size:13px; font-weight:700; transition:.16s ease; }
 .ghost-button { background:#fff; border:1px solid var(--line); }
 .ghost-button:hover { background:#f6f4f2; }
@@ -129,7 +131,7 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 @media (max-width:1540px) { .summary,.notice,.workspace { margin-left:clamp(18px,3vw,45px); margin-right:clamp(18px,3vw,45px); } }
 @media (max-width:1120px) { .workspace { grid-template-columns:minmax(560px,.9fr) minmax(430px,1.1fr); } }
 @media (max-width:900px) {
-  .topbar { min-height:72px; padding:12px 16px; } .brand strong { font-size:15px; } .ghost-button { display:none; }
+  .topbar { min-height:72px; padding:12px 16px; } .brand strong { font-size:15px; } .ghost-button,.sync-status { display:none; }
   .summary { margin-top:18px; } .summary>div { padding:16px 12px; } .summary strong { font-size:21px; } .summary span { font-size:10px; }
   .workspace { display:block; margin-left:14px; margin-right:14px; } .floor-card { margin-bottom:16px; } .hall-wrap { padding-left:12px; padding-right:12px; }
   .guest-card { max-height:none; position:relative; top:0; } .guest-list { max-height:660px; }

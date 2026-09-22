@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://our-seats-wedding.kwonelena.chatgpt.site'),
+  metadataBase: new URL('https://ngrl-wedding-seat.kwonelena.chatgpt.site'),
   title: '너굴릴라 웨딩 자리배치도',
   description: '너굴릴라 웨딩 하객 명단과 23개 원탁 자리배치도',
   openGraph: {

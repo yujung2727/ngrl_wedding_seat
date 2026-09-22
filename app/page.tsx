@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Guest = { id: number; name: string; side: '신부측' | '신랑측'; group: string };
 type TableState = { capacity: 8 | 9 | 10; seats: Array<number | null> };
 type SideFilter = '전체' | '신부측' | '신랑측' | '미배정';
+type SharedState = { guests: Guest[]; tables: TableState[] };
 
 const STORAGE_KEY = 'our-seats-v1';
 const GROUPS = [
@@ -21,6 +22,28 @@ const ANNEX_TABLE_POSITIONS = [[20, 50], [50, 50], [80, 50]];
 
 function emptyTables(): TableState[] {
   return Array.from({ length: 23 }, () => ({ capacity: 10, seats: Array(10).fill(null) }));
+}
+
+function normalizeSavedState(value: unknown): SharedState | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<SharedState>;
+  if (!Array.isArray(candidate.guests) || !candidate.guests.length || !Array.isArray(candidate.tables)) return null;
+  if (candidate.tables.length !== 20 && candidate.tables.length !== 23) return null;
+  const guestsAreValid = candidate.guests.every((guest) => guest
+    && typeof guest.id === 'number'
+    && typeof guest.name === 'string'
+    && (guest.side === '신부측' || guest.side === '신랑측')
+    && typeof guest.group === 'string');
+  const tablesAreValid = candidate.tables.every((table) => table
+    && (table.capacity === 8 || table.capacity === 9 || table.capacity === 10)
+    && Array.isArray(table.seats)
+    && table.seats.length === 10
+    && table.seats.every((id) => id === null || typeof id === 'number'));
+  if (!guestsAreValid || !tablesAreValid) return null;
+  const tables = candidate.tables.length === 20
+    ? [...candidate.tables, ...emptyTables().slice(20)]
+    : candidate.tables;
+  return { guests: candidate.guests, tables };
 }
 
 function parseCompactRoster(raw: string): Guest[] {
@@ -64,25 +87,53 @@ export default function Home() {
   const [pasteText, setPasteText] = useState('');
   const [notice, setNotice] = useState('테이블을 고르고 이름을 누르면 바로 배정돼요.');
   const [ready, setReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('공동 배치를 불러오는 중…');
+  const [retryNonce, setRetryNonce] = useState(0);
+  const cloudVersionRef = useRef(0);
+  const savedSnapshotRef = useRef('');
+  const saveTimerRef = useRef<number | null>(null);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      let localState: SharedState | null = null;
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved) as { guests: Guest[]; tables: TableState[] };
-          if (parsed.guests?.length && (parsed.tables?.length === 20 || parsed.tables?.length === 23)) {
-            const migratedTables = parsed.tables.length === 20
-              ? [...parsed.tables, ...emptyTables().slice(20)]
-              : parsed.tables;
-            if (!cancelled) { setGuests(parsed.guests); setTables(migratedTables); setReady(true); }
-            return;
+        if (saved) localState = normalizeSavedState(JSON.parse(saved));
+      } catch {}
+
+      try {
+        const response = await fetch('/api/seating', { cache: 'no-store' });
+        if (!response.ok) throw new Error('shared storage unavailable');
+        const shared = await response.json() as { state: unknown; version: number };
+        const sharedState = normalizeSavedState(shared.state);
+        if (sharedState) {
+          if (!cancelled) {
+            const snapshot = JSON.stringify(sharedState);
+            cloudVersionRef.current = shared.version;
+            savedSnapshotRef.current = snapshot;
+            localStorage.setItem(STORAGE_KEY, snapshot);
+            setGuests(sharedState.guests);
+            setTables(sharedState.tables);
+            setSyncStatus('모든 기기에 저장됨');
+            setReady(true);
           }
+          return;
         }
       } catch {}
-      const raw = await fetch('/roster.txt').then((response) => response.text());
-      if (!cancelled) { setGuests(parseCompactRoster(raw)); setReady(true); }
+
+      const fallback = localState ?? {
+        guests: parseCompactRoster(await fetch('/roster.txt').then((response) => response.text())),
+        tables: emptyTables(),
+      };
+      if (!cancelled) {
+        savedSnapshotRef.current = '';
+        setGuests(fallback.guests);
+        setTables(fallback.tables);
+        setSyncStatus('공동 저장 준비 중…');
+        setReady(true);
+      }
     }
     load();
     return () => { cancelled = true; };
@@ -90,7 +141,60 @@ export default function Home() {
 
   useEffect(() => {
     if (!ready || !guests.length) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ guests, tables }));
+    const snapshot = JSON.stringify({ guests, tables });
+    localStorage.setItem(STORAGE_KEY, snapshot);
+    if (snapshot === savedSnapshotRef.current) return;
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    setSyncStatus('공동 저장 중…');
+    saveTimerRef.current = window.setTimeout(async () => {
+      savingRef.current = true;
+      saveTimerRef.current = null;
+      try {
+        const response = await fetch('/api/seating', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: { guests, tables } }),
+        });
+        if (!response.ok) throw new Error('save failed');
+        const result = await response.json() as { version: number };
+        cloudVersionRef.current = result.version;
+        savedSnapshotRef.current = snapshot;
+        setSyncStatus('모든 기기에 저장됨');
+      } catch {
+        setSyncStatus('연결 확인 중…');
+        saveTimerRef.current = window.setTimeout(() => setRetryNonce((value) => value + 1), 3000);
+      } finally {
+        savingRef.current = false;
+      }
+    }, 650);
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
+  }, [guests, tables, ready, retryNonce]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const interval = window.setInterval(async () => {
+      if (savingRef.current || saveTimerRef.current) return;
+      const currentSnapshot = JSON.stringify({ guests, tables });
+      if (currentSnapshot !== savedSnapshotRef.current) return;
+      try {
+        const response = await fetch('/api/seating', { cache: 'no-store' });
+        if (!response.ok) return;
+        const shared = await response.json() as { state: unknown; version: number };
+        if (shared.version <= cloudVersionRef.current) return;
+        const sharedState = normalizeSavedState(shared.state);
+        if (!sharedState) return;
+        const snapshot = JSON.stringify(sharedState);
+        cloudVersionRef.current = shared.version;
+        savedSnapshotRef.current = snapshot;
+        localStorage.setItem(STORAGE_KEY, snapshot);
+        setGuests(sharedState.guests);
+        setTables(sharedState.tables);
+        setSyncStatus('상대방의 최신 배치를 반영했어요');
+      } catch {}
+    }, 4000);
+    return () => window.clearInterval(interval);
   }, [guests, tables, ready]);
 
   const assignments = useMemo(() => {
@@ -169,7 +273,7 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="맨 위로"><img className="brand-logo" src="/logo-ngrl.png" alt="너굴릴라 로고" /><strong>너굴릴라 웨딩 자리배치도</strong></a>
-        <div className="top-actions"><button className="ghost-button" onClick={resetSeating}>배정 초기화</button><button className="primary-button" onClick={() => setPasteOpen(true)}>명단 붙여넣기</button></div>
+        <div className="top-actions"><span className="sync-status" aria-live="polite"><i />{syncStatus}</span><button className="ghost-button" onClick={resetSeating}>배정 초기화</button><button className="primary-button" onClick={() => setPasteOpen(true)}>명단 붙여넣기</button></div>
       </header>
 
       <section className="summary" id="top" aria-label="배치 현황">
