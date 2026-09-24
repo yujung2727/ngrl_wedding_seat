@@ -7,6 +7,8 @@ type TableState = { capacity: 8 | 9 | 10; seats: Array<number | null> };
 type SideFilter = '전체' | '신부측' | '신랑측' | '미배정';
 type SharedState = { guests: Guest[]; tables: TableState[]; tableOrder: number[] };
 type HallSide = 'bride' | 'groom';
+type ViewMode = 'seating' | 'roster';
+type RosterSideFilter = '전체' | Guest['side'];
 type SeatTarget = { tableIndex: number; seatIndex: number; excludeGuestId?: number };
 
 const STORAGE_KEY = 'our-seats-v1';
@@ -112,6 +114,9 @@ export default function Home() {
   const [seatQuery, setSeatQuery] = useState('');
   const [swapSource, setSwapSource] = useState<number | null>(null);
   const [hallSide, setHallSide] = useState<HallSide>('bride');
+  const [viewMode, setViewMode] = useState<ViewMode>('seating');
+  const [rosterQuery, setRosterQuery] = useState('');
+  const [rosterSide, setRosterSide] = useState<RosterSideFilter>('전체');
   const [notice, setNotice] = useState('테이블을 고르고 이름을 누르면 바로 배정돼요.');
   const [ready, setReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState('공동 배치를 불러오는 중…');
@@ -255,6 +260,11 @@ export default function Home() {
     if (assignments.has(guest.id) || guest.id === targetSeat?.excludeGuestId) return false;
     return `${guest.name} ${guest.side} ${guest.group}`.toLowerCase().includes(seatQuery.trim().toLowerCase());
   }), [assignments, guests, seatQuery, targetSeat]);
+  const rosterGuests = useMemo(() => guests.filter((guest) => {
+    const matchesSide = rosterSide === '전체' || guest.side === rosterSide;
+    const haystack = `${guest.name} ${guest.side} ${guest.group}`.toLowerCase();
+    return matchesSide && haystack.includes(rosterQuery.trim().toLowerCase());
+  }), [guests, rosterQuery, rosterSide]);
 
   function chooseGuest(guest: Guest) {
     const current = assignments.get(guest.id);
@@ -383,6 +393,41 @@ export default function Home() {
     setTables(emptyTables()); setNotice('모든 좌석을 비웠어요.');
   }
 
+  function updateGuest<K extends 'name' | 'side' | 'group'>(id: number, field: K, value: Guest[K]) {
+    setGuests((previous) => previous.map((guest) => guest.id === id
+      ? { ...guest, [field]: value }
+      : guest));
+  }
+
+  function addGuest() {
+    const nextId = guests.reduce((highest, guest) => Math.max(highest, guest.id), 0) + 1;
+    setGuests((previous) => [...previous, { id: nextId, name: '새 하객', side: '신부측', group: '기타' }]);
+    setRosterQuery('');
+    setRosterSide('전체');
+    setNotice('새 하객을 추가했어요. 이름과 구분을 바로 수정하세요.');
+    window.setTimeout(() => document.getElementById(`guest-name-${nextId}`)?.focus(), 0);
+  }
+
+  function deleteGuest(guest: Guest) {
+    if (guests.length === 1) {
+      setNotice('명단에는 하객이 한 명 이상 있어야 해요.');
+      return;
+    }
+    const assignment = assignments.get(guest.id);
+    const message = assignment
+      ? `${guest.name} 님은 ${assignment.table + 1}번 테이블에 배정되어 있어요. 명단과 좌석에서 모두 삭제할까요?`
+      : `${guest.name} 님을 명단에서 삭제할까요?`;
+    if (!window.confirm(message)) return;
+    setGuests((previous) => previous.filter((person) => person.id !== guest.id));
+    if (assignment) {
+      setTables((previous) => previous.map((table) => ({
+        ...table,
+        seats: table.seats.map((id) => id === guest.id ? null : id),
+      })));
+    }
+    setNotice(`${guest.name} 님을 명단에서 삭제했어요.`);
+  }
+
   function renderTable(table: TableState, index: number, position: number[]) {
     const count = table.seats.filter((id) => id !== null).length;
     const tableTone = index < 10 || index === 19 ? 'bride' : index < 19 ? 'groom' : 'annex';
@@ -405,15 +450,20 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="맨 위로"><img className="brand-logo" src="/logo-ngrl.png" alt="너굴릴라 로고" /><strong>너굴릴라 웨딩 자리배치도</strong></a>
-        <div className="top-actions"><span className="sync-status" aria-live="polite"><i />{syncStatus}</span><button className="ghost-button" onClick={resetSeating}>배정 초기화</button><button className="primary-button" onClick={() => setPasteOpen(true)}>명단 붙여넣기</button></div>
+        <div className="top-actions"><span className="sync-status" aria-live="polite"><i />{syncStatus}</span>{viewMode === 'seating' && <button className="ghost-button" onClick={resetSeating}>배정 초기화</button>}<button className="primary-button" onClick={() => setPasteOpen(true)}>명단 붙여넣기</button></div>
       </header>
 
-      <section className="summary" id="top" aria-label="배치 현황">
-        <div><span>전체 하객</span><strong>{guests.length}<small>명</small></strong></div><div><span>배정 완료</span><strong>{assignments.size}<small>명</small></strong></div><div><span>남은 하객</span><strong>{guests.length - assignments.size}<small>명</small></strong></div><div><span>전체 좌석</span><strong>{tables.reduce((sum, table) => sum + table.capacity, 0)}<small>석</small></strong></div>
-      </section>
+      <nav className="main-tabs" id="top" aria-label="화면 선택">
+        <button className={viewMode === 'seating' ? 'active' : ''} onClick={() => setViewMode('seating')} aria-current={viewMode === 'seating' ? 'page' : undefined}>자리 배치</button>
+        <button className={viewMode === 'roster' ? 'active' : ''} onClick={() => setViewMode('roster')} aria-current={viewMode === 'roster' ? 'page' : undefined}>명단 관리 <span>{guests.length}</span></button>
+      </nav>
 
       <p className="notice" role="status"><span>●</span>{notice}</p>
-      <section className="workspace">
+      {viewMode === 'seating' ? <>
+        <section className="summary" aria-label="배치 현황">
+          <div><span>전체 하객</span><strong>{guests.length}<small>명</small></strong></div><div><span>배정 완료</span><strong>{assignments.size}<small>명</small></strong></div><div><span>남은 하객</span><strong>{guests.length - assignments.size}<small>명</small></strong></div><div><span>전체 좌석</span><strong>{tables.reduce((sum, table) => sum + table.capacity, 0)}<small>석</small></strong></div>
+        </section>
+        <section className="workspace">
         <div className="floor-card card">
           <div className="card-heading"><div><h2>웨딩홀 배치도</h2><p>{hallSide === 'bride' ? '신부측 1–10번·20번 · 별도 홀 21–23번' : '신랑측 11–19번'} · 테이블당 8–10석</p></div><div className="hall-tabs" role="tablist" aria-label="홀 구역 선택"><button role="tab" aria-selected={hallSide === 'bride'} className={hallSide === 'bride' ? 'active bride' : ''} onClick={() => switchHall('bride')}>🦝 신부측</button><button role="tab" aria-selected={hallSide === 'groom'} className={hallSide === 'groom' ? 'active groom' : ''} onClick={() => switchHall('groom')}>🦍 신랑측</button></div></div>
           <div className="hall-wrap">
@@ -448,7 +498,36 @@ export default function Home() {
             {visibleGuests.map((guest) => { const assigned = assignments.get(guest.id); const here = assigned?.table === selected; return <button key={guest.id} className={`guest-row ${here ? 'here' : ''}`} onClick={() => chooseGuest(guest)}><span className={`avatar ${guest.side === '신랑측' ? 'groom' : ''}`}>{guest.name.slice(0, 1)}</span><span className="guest-name"><strong>{guest.name}</strong><small>{guest.side} · {guest.group}</small></span><span className={`assignment ${assigned ? 'assigned' : ''}`}>{assigned ? `${assigned.table + 1}번 · ${assigned.seat + 1}석` : '+ 배정'}</span></button>; })}
           </div>
         </aside>
-      </section>
+        </section>
+      </> : <section className="roster-workspace card">
+        <header className="roster-heading">
+          <div><span className="section-label">공동 명단</span><h1>하객 명단 관리</h1><p>이름, 구분, 신랑·신부측을 바로 수정할 수 있어요. 이미 배정된 좌석은 그대로 유지됩니다.</p></div>
+          <button className="primary-button add-guest-button" onClick={addGuest}>+ 하객 추가</button>
+        </header>
+        <div className="roster-toolbar">
+          <label className="search-box roster-search"><span>⌕</span><input value={rosterQuery} onChange={(event) => setRosterQuery(event.target.value)} placeholder="이름 또는 구분 검색" aria-label="명단 검색" /></label>
+          <div className="roster-side-filter" role="group" aria-label="하객측 필터">{(['전체', '신부측', '신랑측'] as RosterSideFilter[]).map((side) => <button key={side} className={rosterSide === side ? 'active' : ''} onClick={() => setRosterSide(side)}>{side}</button>)}</div>
+          <strong className="roster-count">{rosterGuests.length}명</strong>
+        </div>
+        <div className="roster-table-wrap">
+          <div className="roster-row roster-labels" aria-hidden="true"><span>No.</span><span>이름</span><span>신랑·신부측</span><span>구분</span><span>배정</span><span /></div>
+          {!ready && <p className="empty-state">명단을 불러오는 중이에요…</p>}
+          {ready && !rosterGuests.length && <p className="empty-state">조건에 맞는 하객이 없어요.</p>}
+          {rosterGuests.map((guest) => {
+            const assigned = assignments.get(guest.id);
+            const number = guests.findIndex((person) => person.id === guest.id) + 1;
+            return <div className="roster-row" key={guest.id}>
+              <span className="roster-number">{number}</span>
+              <label><span className="mobile-field-label">이름</span><input id={`guest-name-${guest.id}`} className="roster-input name-input" value={guest.name} onChange={(event) => updateGuest(guest.id, 'name', event.target.value)} onBlur={(event) => !event.target.value.trim() && updateGuest(guest.id, 'name', '이름 없음')} aria-label={`${number}번째 하객 이름`} /></label>
+              <label><span className="mobile-field-label">신랑·신부측</span><select className={`roster-input side-select ${guest.side === '신랑측' ? 'groom' : 'bride'}`} value={guest.side} onChange={(event) => updateGuest(guest.id, 'side', event.target.value as Guest['side'])} aria-label={`${guest.name} 측 구분`}><option>신부측</option><option>신랑측</option></select></label>
+              <label><span className="mobile-field-label">구분</span><input className="roster-input" value={guest.group} onChange={(event) => updateGuest(guest.id, 'group', event.target.value)} onBlur={(event) => !event.target.value.trim() && updateGuest(guest.id, 'group', '기타')} list="group-suggestions" aria-label={`${guest.name} 관계 또는 구분`} /></label>
+              <span className={`roster-assignment ${assigned ? 'assigned' : ''}`}>{assigned ? `${assigned.table + 1}번 테이블` : '미배정'}</span>
+              <button className="delete-guest-button" onClick={() => deleteGuest(guest)} aria-label={`${guest.name} 삭제`} title="명단에서 삭제">×</button>
+            </div>;
+          })}
+        </div>
+        <datalist id="group-suggestions">{groups.slice(1).map((group) => <option key={group} value={group} />)}</datalist>
+      </section>}
 
       {editingGuest && editingAssignment && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setEditingGuestId(null)}><section className="assignment-modal" role="dialog" aria-modal="true" aria-labelledby="assignment-title"><button className="modal-close" onClick={() => setEditingGuestId(null)} aria-label="닫기">×</button><span className={`assignment-avatar ${editingGuest.side === '신랑측' ? 'groom' : ''}`}>{editingGuest.name.slice(0, 1)}</span><h2 id="assignment-title">{editingGuest.name}</h2><p>현재 {editingAssignment.table + 1}번 테이블 · {editingAssignment.seat + 1}번 좌석</p><div className="assignment-actions"><button className="remove-button" onClick={() => clearEditingGuest(false)}>배정 해제</button><button className="primary-button" onClick={() => clearEditingGuest(true)}>다른 사람으로 교체</button></div></section></div>}
       {targetSeat && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setTargetSeat(null)}><section className="seat-picker-modal" role="dialog" aria-modal="true" aria-labelledby="seat-picker-title"><button className="modal-close" onClick={() => setTargetSeat(null)} aria-label="닫기">×</button><span className="section-label">빈자리에 바로 배정</span><h2 id="seat-picker-title">{targetSeat.tableIndex + 1}번 테이블 · {targetSeat.seatIndex + 1}번 자리</h2><p>배정할 하객을 선택하세요. 이미 배정된 사람은 표시되지 않습니다.</p><label className="seat-picker-search"><span>⌕</span><input value={seatQuery} onChange={(event) => setSeatQuery(event.target.value)} placeholder="이름 또는 관계 검색" aria-label="배정할 하객 검색" autoFocus /></label><div className="seat-picker-list">{!seatPickerGuests.length && <p className="empty-state">조건에 맞는 미배정 하객이 없어요.</p>}{seatPickerGuests.map((guest) => <button key={guest.id} className="seat-picker-row" onClick={() => assignGuestToTargetSeat(guest)}><span className={`avatar ${guest.side === '신랑측' ? 'groom' : ''}`}>{guest.name.slice(0, 1)}</span><span className="guest-name"><strong>{guest.name}</strong><small>{guest.side} · {guest.group}</small></span><span>이 자리에 배정</span></button>)}</div></section></div>}
