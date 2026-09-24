@@ -362,8 +362,16 @@ export default function Home() {
   }
 
   function setCapacity(capacity: 8 | 9 | 10) {
-    if (selectedTable.seats.slice(capacity).some((id) => id !== null)) { setNotice('줄어드는 좌석에 배정된 이름을 먼저 빼주세요.'); return; }
-    setTables((previous) => previous.map((table, index) => index === selected ? { ...table, capacity } : table));
+    const assignedGuestIds = selectedTable.seats.filter((id): id is number => id !== null);
+    if (assignedGuestIds.length > capacity) {
+      setNotice(`${selected + 1}번 테이블에는 ${assignedGuestIds.length}명이 배정되어 있어 ${capacity}석으로 줄일 수 없어요.`);
+      return;
+    }
+    const compactedSeats = [...assignedGuestIds, ...Array(10 - assignedGuestIds.length).fill(null)];
+    setTables((previous) => previous.map((table, index) => index === selected
+      ? { ...table, capacity, seats: compactedSeats }
+      : table));
+    setNotice(`${selected + 1}번 테이블을 ${capacity}석으로 바꾸고 빈자리를 정리했어요.`);
   }
 
   function toggleSwapMode() {
