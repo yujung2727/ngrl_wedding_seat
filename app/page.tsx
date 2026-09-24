@@ -36,6 +36,10 @@ function isValidTableOrder(value: unknown): value is number[] {
     && value.every((index) => Number.isInteger(index) && index >= 0 && index < 23);
 }
 
+function isDefaultTableOrder(value: number[]) {
+  return value.every((index, position) => index === DEFAULT_TABLE_ORDER[position]);
+}
+
 function tableSection(index: number) {
   if (index < 10 || index === 19) return 'bride';
   if (index < 19) return 'groom';
@@ -44,6 +48,31 @@ function tableSection(index: number) {
 
 function emptyTables(): TableState[] {
   return Array.from({ length: 23 }, () => ({ capacity: 10, seats: Array(10).fill(null) }));
+}
+
+function capacityForSeats(capacity: TableState['capacity'], seats: Array<number | null>): TableState['capacity'] {
+  const highestOccupiedSeat = seats.reduce((highest, id, index) => id === null ? highest : index + 1, 0);
+  if (highestOccupiedSeat <= capacity) return capacity;
+  return highestOccupiedSeat <= 8 ? 8 : highestOccupiedSeat === 9 ? 9 : 10;
+}
+
+function restoreFixedTableNumbers(tables: TableState[], tableOrder: number[]) {
+  if (isDefaultTableOrder(tableOrder)) return tables;
+  const restored = tables.map((table) => ({ ...table, seats: [...table.seats] }));
+  for (const section of ['bride', 'groom', 'annex']) {
+    const fixedNumbers = DEFAULT_TABLE_ORDER.filter((index) => tableSection(index) === section);
+    const displayedNumbers = tableOrder.filter((index) => tableSection(index) === section);
+    fixedNumbers.forEach((targetIndex, position) => {
+      const sourceIndex = displayedNumbers[position];
+      const sourceSeats = [...tables[sourceIndex].seats];
+      restored[targetIndex] = {
+        ...restored[targetIndex],
+        capacity: capacityForSeats(restored[targetIndex].capacity, sourceSeats),
+        seats: sourceSeats,
+      };
+    });
+  }
+  return restored;
 }
 
 function normalizeSavedState(value: unknown): SharedState | null {
@@ -62,11 +91,12 @@ function normalizeSavedState(value: unknown): SharedState | null {
     && table.seats.length === 10
     && table.seats.every((id) => id === null || typeof id === 'number'));
   if (!guestsAreValid || !tablesAreValid) return null;
-  const tables = candidate.tables.length === 20
+  const expandedTables = candidate.tables.length === 20
     ? [...candidate.tables, ...emptyTables().slice(20)]
     : candidate.tables;
   const tableOrder = isValidTableOrder(candidate.tableOrder) ? candidate.tableOrder : [...DEFAULT_TABLE_ORDER];
-  return { guests: candidate.guests, tables, tableOrder };
+  const tables = restoreFixedTableNumbers(expandedTables, tableOrder);
+  return { guests: candidate.guests, tables, tableOrder: [...DEFAULT_TABLE_ORDER] };
 }
 
 function parseCompactRoster(raw: string): Guest[] {
@@ -143,8 +173,10 @@ export default function Home() {
         if (sharedState) {
           if (!cancelled) {
             const snapshot = JSON.stringify(sharedState);
+            const savedOrder = (shared.state as { tableOrder?: unknown } | null)?.tableOrder;
+            const needsFixedNumberMigration = isValidTableOrder(savedOrder) && !isDefaultTableOrder(savedOrder);
             cloudVersionRef.current = shared.version;
-            savedSnapshotRef.current = snapshot;
+            savedSnapshotRef.current = needsFixedNumberMigration ? '' : snapshot;
             localStorage.setItem(STORAGE_KEY, snapshot);
             setGuests(sharedState.guests);
             setTables(sharedState.tables);
@@ -337,11 +369,11 @@ export default function Home() {
   function toggleSwapMode() {
     if (swapSource !== null) {
       setSwapSource(null);
-      setNotice('테이블 위치 바꾸기를 취소했어요.');
+      setNotice('테이블 하객 맞바꾸기를 취소했어요.');
       return;
     }
     setSwapSource(selected);
-    setNotice(`${selected + 1}번 테이블과 위치를 바꿀 테이블을 배치도에서 누르세요.`);
+    setNotice(`${selected + 1}번과 하객을 맞바꿀 테이블을 배치도에서 누르세요. 번호 위치는 그대로 유지됩니다.`);
   }
 
   function selectOrSwapTable(index: number) {
@@ -352,21 +384,30 @@ export default function Home() {
     }
     if (index === swapSource) {
       setSwapSource(null);
-      setNotice('테이블 위치 바꾸기를 취소했어요.');
+      setNotice('테이블 하객 맞바꾸기를 취소했어요.');
       return;
     }
     if (tableSection(index) !== tableSection(swapSource)) {
       setNotice('같은 홀 안에 있는 테이블끼리 위치를 바꿀 수 있어요.');
       return;
     }
-    setTableOrder((previous) => {
-      const next = [...previous];
-      const sourcePosition = next.indexOf(swapSource);
-      const targetPosition = next.indexOf(index);
-      [next[sourcePosition], next[targetPosition]] = [next[targetPosition], next[sourcePosition]];
+    setTables((previous) => {
+      const next = previous.map((table) => ({ ...table, seats: [...table.seats] }));
+      const sourceSeats = [...previous[swapSource].seats];
+      const targetSeats = [...previous[index].seats];
+      next[swapSource] = {
+        ...next[swapSource],
+        capacity: capacityForSeats(next[swapSource].capacity, targetSeats),
+        seats: targetSeats,
+      };
+      next[index] = {
+        ...next[index],
+        capacity: capacityForSeats(next[index].capacity, sourceSeats),
+        seats: sourceSeats,
+      };
       return next;
     });
-    setNotice(`${swapSource + 1}번과 ${index + 1}번 테이블의 위치를 바꿨어요.`);
+    setNotice(`${swapSource + 1}번과 ${index + 1}번 테이블의 하객을 맞바꿨어요. 테이블 번호는 그대로예요.`);
     setSwapSource(null);
   }
 
@@ -442,7 +483,7 @@ export default function Home() {
           ? <button key={seatIndex} className={`table-seat-name ${guest.side === '신부측' ? 'bride' : 'groom'}`} style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} title={`${guest.name} 님 교체 또는 배정 해제`} onClick={() => openAssignmentEditor(guest, index)}>{guest.name}</button>
           : <button key={seatIndex} className="empty-seat-dot" style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} onClick={() => openSeatPicker(index, seatIndex)} aria-label={`${index + 1}번 테이블 ${seatIndex + 1}번 빈자리 배정`} title="이 자리에 하객 배정">+</button>;
       })}
-      <button className={`round-table ${selected === index ? 'selected' : ''} ${count === table.capacity ? 'full' : ''}`} onClick={() => selectOrSwapTable(index)} aria-pressed={selected === index} aria-label={`${index + 1}번 테이블, ${count}명 배정${canSwapHere && index !== swapSource ? ', 위치 바꾸기 대상' : ''}`}><b>{index + 1}</b><small>{count} / {table.capacity}</small></button>
+      <button className={`round-table ${selected === index ? 'selected' : ''} ${count === table.capacity ? 'full' : ''}`} onClick={() => selectOrSwapTable(index)} aria-pressed={selected === index} aria-label={`${index + 1}번 테이블, ${count}명 배정${canSwapHere && index !== swapSource ? ', 하객 맞바꾸기 대상' : ''}`}><b>{index + 1}</b><small>{count} / {table.capacity}</small></button>
     </div>;
   }
 
@@ -488,7 +529,7 @@ export default function Home() {
 
         <aside className="guest-card card">
           <div className="guest-sticky">
-            <div className="table-editor-head"><div><span className="section-label">선택한 테이블</span><h2>{String(selected + 1).padStart(2, '0')}번 테이블</h2></div><div className="table-editor-controls"><button className={`swap-table-button ${swapSource !== null ? 'active' : ''}`} onClick={toggleSwapMode}>{swapSource !== null ? '바꾸기 취소' : '위치 바꾸기'}</button><div className="capacity-picker" aria-label="테이블 좌석 수">{([8, 9, 10] as const).map((capacity) => <button key={capacity} className={selectedTable.capacity === capacity ? 'active' : ''} onClick={() => setCapacity(capacity)}>{capacity}</button>)}</div></div></div>
+            <div className="table-editor-head"><div><span className="section-label">선택한 테이블</span><h2>{String(selected + 1).padStart(2, '0')}번 테이블</h2></div><div className="table-editor-controls"><button className={`swap-table-button ${swapSource !== null ? 'active' : ''}`} onClick={toggleSwapMode}>{swapSource !== null ? '맞바꾸기 취소' : '하객 맞바꾸기'}</button><div className="capacity-picker" aria-label="테이블 좌석 수">{([8, 9, 10] as const).map((capacity) => <button key={capacity} className={selectedTable.capacity === capacity ? 'active' : ''} onClick={() => setCapacity(capacity)}>{capacity}</button>)}</div></div></div>
             <div className="list-title"><div><h2>전체 하객 명단</h2><p>이름을 누르면 선택한 테이블에 바로 배정됩니다.</p></div><strong>{visibleGuests.length}명</strong></div>
             <label className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 관계 검색" aria-label="하객 검색" /></label>
             <div className="filters">{(['전체', '신부측', '신랑측', '미배정'] as SideFilter[]).map((filter) => <button key={filter} className={sideFilter === filter ? 'active' : ''} onClick={() => setSideFilter(filter)}>{filter}</button>)}<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} aria-label="관계 그룹 필터">{groups.map((group) => <option key={group}>{group}</option>)}</select></div>
