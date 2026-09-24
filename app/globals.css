@@ -202,6 +202,8 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
   .main-tabs { margin-left:14px; margin-right:14px; } .main-tabs button { flex:1; padding:0 10px; }
   .summary { grid-template-columns:repeat(2,1fr); } .summary>div:nth-child(2) { border-right:0; } .summary>div:nth-child(-n+2) { border-bottom:1px solid var(--line); }
   .card-heading { align-items:flex-start; flex-direction:column; } .hall-tabs { width:100%; } .hall-tabs button { flex:1; }
+  .hall-wrap { overflow-x:hidden; padding-left:8px; padding-right:8px; } .hall,.annex-section { min-width:0; }
+  .table-cluster { transform:translate(-50%,-50%) scale(.86); } .table-cluster.column-left { left:35% !important; } .table-cluster.column-right { left:65% !important; } .table-cluster.column-center { left:50% !important; }
   .table-editor-head { align-items:flex-start; } .table-editor-controls { align-items:flex-end; flex-direction:column; }
   .guest-sticky { padding:19px 14px 12px; } .paste-modal,.assignment-modal,.seat-picker-modal { padding:25px 18px 20px; }
   .roster-workspace { margin-left:14px; margin-right:14px; } .roster-heading { padding:22px 18px; flex-direction:column; } .roster-heading h1 { font-size:23px; } .add-guest-button { width:100%; }

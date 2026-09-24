@@ -480,8 +480,9 @@ export default function Home() {
   function renderTable(table: TableState, index: number, position: number[]) {
     const count = table.seats.filter((id) => id !== null).length;
     const tableTone = index < 10 || index === 19 ? 'bride' : index < 19 ? 'groom' : 'annex';
+    const tableColumn = position[0] < 40 ? 'column-left' : position[0] > 60 ? 'column-right' : 'column-center';
     const canSwapHere = swapSource !== null && tableSection(swapSource) === tableSection(index);
-    return <div key={index} className={`table-cluster ${tableTone} ${swapSource === index ? 'swap-source' : canSwapHere ? 'swap-target' : ''}`} style={{ left: `${position[0]}%`, top: `${position[1]}%` }}>
+    return <div key={index} className={`table-cluster ${tableTone} ${tableColumn} ${swapSource === index ? 'swap-source' : canSwapHere ? 'swap-target' : ''}`} style={{ left: `${position[0]}%`, top: `${position[1]}%` }}>
       {table.seats.slice(0, table.capacity).map((id, seatIndex) => {
         const guest = guests.find((person) => person.id === id);
         const angle = (-90 + seatIndex * 360 / table.capacity) * Math.PI / 180;
