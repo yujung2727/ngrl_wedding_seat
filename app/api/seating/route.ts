@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 type SharedState = {
   guests: unknown[];
   tables: unknown[];
+  tableOrder?: unknown[];
 };
 
 function isValidGuest(value: unknown) {
@@ -24,6 +25,13 @@ function isValidTable(value: unknown) {
     && Array.isArray(table.seats)
     && table.seats.length === 10
     && table.seats.every((id) => id === null || typeof id === 'number');
+}
+
+function isValidTableOrder(value: unknown) {
+  return Array.isArray(value)
+    && value.length === 23
+    && new Set(value).size === 23
+    && value.every((index) => typeof index === 'number' && Number.isInteger(index) && index >= 0 && index < 23);
 }
 
 function database(): D1Database {
@@ -69,7 +77,8 @@ export async function PUT(request: Request) {
   if (body.state.tables.length !== 23
     || body.state.guests.length > 1000
     || !body.state.guests.every(isValidGuest)
-    || !body.state.tables.every(isValidTable)) {
+    || !body.state.tables.every(isValidTable)
+    || (body.state.tableOrder !== undefined && !isValidTableOrder(body.state.tableOrder))) {
     return json({ error: '배치 데이터의 크기가 올바르지 않습니다.' }, { status: 400 });
   }
 

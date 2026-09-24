@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 type Guest = { id: number; name: string; side: '신부측' | '신랑측'; group: string };
 type TableState = { capacity: 8 | 9 | 10; seats: Array<number | null> };
 type SideFilter = '전체' | '신부측' | '신랑측' | '미배정';
-type SharedState = { guests: Guest[]; tables: TableState[] };
+type SharedState = { guests: Guest[]; tables: TableState[]; tableOrder: number[] };
 type HallSide = 'bride' | 'groom';
 type SeatTarget = { tableIndex: number; seatIndex: number; excludeGuestId?: number };
 
@@ -25,6 +25,20 @@ const GROOM_TABLE_POSITIONS = [
   [72, 62], [28, 72], [72, 82], [50, 92],
 ];
 const ANNEX_TABLE_POSITIONS = [[50, 27], [72, 73], [28, 73]];
+const DEFAULT_TABLE_ORDER = Array.from({ length: 23 }, (_, index) => index);
+
+function isValidTableOrder(value: unknown): value is number[] {
+  return Array.isArray(value)
+    && value.length === 23
+    && new Set(value).size === 23
+    && value.every((index) => Number.isInteger(index) && index >= 0 && index < 23);
+}
+
+function tableSection(index: number) {
+  if (index < 10 || index === 19) return 'bride';
+  if (index < 19) return 'groom';
+  return 'annex';
+}
 
 function emptyTables(): TableState[] {
   return Array.from({ length: 23 }, () => ({ capacity: 10, seats: Array(10).fill(null) }));
@@ -49,7 +63,8 @@ function normalizeSavedState(value: unknown): SharedState | null {
   const tables = candidate.tables.length === 20
     ? [...candidate.tables, ...emptyTables().slice(20)]
     : candidate.tables;
-  return { guests: candidate.guests, tables };
+  const tableOrder = isValidTableOrder(candidate.tableOrder) ? candidate.tableOrder : [...DEFAULT_TABLE_ORDER];
+  return { guests: candidate.guests, tables, tableOrder };
 }
 
 function parseCompactRoster(raw: string): Guest[] {
@@ -85,6 +100,7 @@ function parsePastedRoster(raw: string): Guest[] {
 export default function Home() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [tables, setTables] = useState<TableState[]>(emptyTables);
+  const [tableOrder, setTableOrder] = useState<number[]>(() => [...DEFAULT_TABLE_ORDER]);
   const [selected, setSelected] = useState(0);
   const [query, setQuery] = useState('');
   const [sideFilter, setSideFilter] = useState<SideFilter>('전체');
@@ -94,6 +110,7 @@ export default function Home() {
   const [editingGuestId, setEditingGuestId] = useState<number | null>(null);
   const [targetSeat, setTargetSeat] = useState<SeatTarget | null>(null);
   const [seatQuery, setSeatQuery] = useState('');
+  const [swapSource, setSwapSource] = useState<number | null>(null);
   const [hallSide, setHallSide] = useState<HallSide>('bride');
   const [notice, setNotice] = useState('테이블을 고르고 이름을 누르면 바로 배정돼요.');
   const [ready, setReady] = useState(false);
@@ -126,6 +143,7 @@ export default function Home() {
             localStorage.setItem(STORAGE_KEY, snapshot);
             setGuests(sharedState.guests);
             setTables(sharedState.tables);
+            setTableOrder(sharedState.tableOrder);
             setSyncStatus('모든 기기에 저장됨');
             setReady(true);
           }
@@ -136,11 +154,13 @@ export default function Home() {
       const fallback = localState ?? {
         guests: parseCompactRoster(await fetch('/roster.txt').then((response) => response.text())),
         tables: emptyTables(),
+        tableOrder: [...DEFAULT_TABLE_ORDER],
       };
       if (!cancelled) {
         savedSnapshotRef.current = '';
         setGuests(fallback.guests);
         setTables(fallback.tables);
+        setTableOrder(fallback.tableOrder);
         setSyncStatus('공동 저장 준비 중…');
         setReady(true);
       }
@@ -151,7 +171,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!ready || !guests.length) return;
-    const snapshot = JSON.stringify({ guests, tables });
+    const snapshot = JSON.stringify({ guests, tables, tableOrder });
     localStorage.setItem(STORAGE_KEY, snapshot);
     if (snapshot === savedSnapshotRef.current) return;
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
@@ -163,7 +183,7 @@ export default function Home() {
         const response = await fetch('/api/seating', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state: { guests, tables } }),
+          body: JSON.stringify({ state: { guests, tables, tableOrder } }),
         });
         if (!response.ok) throw new Error('save failed');
         const result = await response.json() as { version: number };
@@ -180,13 +200,13 @@ export default function Home() {
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [guests, tables, ready, retryNonce]);
+  }, [guests, tables, tableOrder, ready, retryNonce]);
 
   useEffect(() => {
     if (!ready) return;
     const interval = window.setInterval(async () => {
       if (savingRef.current || saveTimerRef.current) return;
-      const currentSnapshot = JSON.stringify({ guests, tables });
+      const currentSnapshot = JSON.stringify({ guests, tables, tableOrder });
       if (currentSnapshot !== savedSnapshotRef.current) return;
       try {
         const response = await fetch('/api/seating', { cache: 'no-store' });
@@ -201,11 +221,12 @@ export default function Home() {
         localStorage.setItem(STORAGE_KEY, snapshot);
         setGuests(sharedState.guests);
         setTables(sharedState.tables);
+        setTableOrder(sharedState.tableOrder);
         setSyncStatus('상대방의 최신 배치를 반영했어요');
       } catch {}
     }, 4000);
     return () => window.clearInterval(interval);
-  }, [guests, tables, ready]);
+  }, [guests, tables, tableOrder, ready]);
 
   const assignments = useMemo(() => {
     const map = new Map<number, { table: number; seat: number }>();
@@ -225,6 +246,9 @@ export default function Home() {
   }).sort((a, b) => Number(assignments.has(a.id)) - Number(assignments.has(b.id))), [assignments, groupFilter, guests, query, sideFilter]);
 
   const selectedTable = tables[selected];
+  const brideTableOrder = tableOrder.filter((index) => tableSection(index) === 'bride');
+  const groomTableOrder = tableOrder.filter((index) => tableSection(index) === 'groom');
+  const annexTableOrder = tableOrder.filter((index) => tableSection(index) === 'annex');
   const editingGuest = editingGuestId === null ? null : guests.find((guest) => guest.id === editingGuestId) ?? null;
   const editingAssignment = editingGuest ? assignments.get(editingGuest.id) : undefined;
   const seatPickerGuests = useMemo(() => guests.filter((guest) => {
@@ -300,7 +324,44 @@ export default function Home() {
     setTables((previous) => previous.map((table, index) => index === selected ? { ...table, capacity } : table));
   }
 
+  function toggleSwapMode() {
+    if (swapSource !== null) {
+      setSwapSource(null);
+      setNotice('테이블 위치 바꾸기를 취소했어요.');
+      return;
+    }
+    setSwapSource(selected);
+    setNotice(`${selected + 1}번 테이블과 위치를 바꿀 테이블을 배치도에서 누르세요.`);
+  }
+
+  function selectOrSwapTable(index: number) {
+    if (swapSource === null) {
+      setSelected(index);
+      setNotice(`${index + 1}번 테이블을 선택했어요. 이름을 눌러 배정하세요.`);
+      return;
+    }
+    if (index === swapSource) {
+      setSwapSource(null);
+      setNotice('테이블 위치 바꾸기를 취소했어요.');
+      return;
+    }
+    if (tableSection(index) !== tableSection(swapSource)) {
+      setNotice('같은 홀 안에 있는 테이블끼리 위치를 바꿀 수 있어요.');
+      return;
+    }
+    setTableOrder((previous) => {
+      const next = [...previous];
+      const sourcePosition = next.indexOf(swapSource);
+      const targetPosition = next.indexOf(index);
+      [next[sourcePosition], next[targetPosition]] = [next[targetPosition], next[sourcePosition]];
+      return next;
+    });
+    setNotice(`${swapSource + 1}번과 ${index + 1}번 테이블의 위치를 바꿨어요.`);
+    setSwapSource(null);
+  }
+
   function switchHall(next: HallSide) {
+    setSwapSource(null);
     setHallSide(next);
     if (next === 'bride' && selected >= 10 && selected < 19) setSelected(0);
     if (next === 'groom' && (selected < 10 || selected >= 19)) setSelected(10);
@@ -325,7 +386,8 @@ export default function Home() {
   function renderTable(table: TableState, index: number, position: number[]) {
     const count = table.seats.filter((id) => id !== null).length;
     const tableTone = index < 10 || index === 19 ? 'bride' : index < 19 ? 'groom' : 'annex';
-    return <div key={index} className={`table-cluster ${tableTone}`} style={{ left: `${position[0]}%`, top: `${position[1]}%` }}>
+    const canSwapHere = swapSource !== null && tableSection(swapSource) === tableSection(index);
+    return <div key={index} className={`table-cluster ${tableTone} ${swapSource === index ? 'swap-source' : canSwapHere ? 'swap-target' : ''}`} style={{ left: `${position[0]}%`, top: `${position[1]}%` }}>
       {table.seats.slice(0, table.capacity).map((id, seatIndex) => {
         const guest = guests.find((person) => person.id === id);
         const angle = (-90 + seatIndex * 360 / table.capacity) * Math.PI / 180;
@@ -335,7 +397,7 @@ export default function Home() {
           ? <button key={seatIndex} className={`table-seat-name ${guest.side === '신부측' ? 'bride' : 'groom'}`} style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} title={`${guest.name} 님 교체 또는 배정 해제`} onClick={() => openAssignmentEditor(guest, index)}>{guest.name}</button>
           : <button key={seatIndex} className="empty-seat-dot" style={{ left: `calc(50% + ${x}px)`, top: `calc(50% + ${y}px)` }} onClick={() => openSeatPicker(index, seatIndex)} aria-label={`${index + 1}번 테이블 ${seatIndex + 1}번 빈자리 배정`} title="이 자리에 하객 배정">+</button>;
       })}
-      <button className={`round-table ${selected === index ? 'selected' : ''} ${count === table.capacity ? 'full' : ''}`} onClick={() => { setSelected(index); setNotice(`${index + 1}번 테이블을 선택했어요. 이름을 눌러 배정하세요.`); }} aria-pressed={selected === index} aria-label={`${index + 1}번 테이블, ${count}명 배정`}><b>{index + 1}</b><small>{count} / {table.capacity}</small></button>
+      <button className={`round-table ${selected === index ? 'selected' : ''} ${count === table.capacity ? 'full' : ''}`} onClick={() => selectOrSwapTable(index)} aria-pressed={selected === index} aria-label={`${index + 1}번 테이블, ${count}명 배정${canSwapHere && index !== swapSource ? ', 위치 바꾸기 대상' : ''}`}><b>{index + 1}</b><small>{count} / {table.capacity}</small></button>
     </div>;
   }
 
@@ -358,8 +420,8 @@ export default function Home() {
             <div className={`hall side-hall ${hallSide}`}>
               <div className="stage"><b>STAGE</b><span>{hallSide === 'bride' ? '신부측 · 1–10번 / 20번' : '신랑측 · 11–19번'}</span></div>
               <span className={`mascot-label side-mascot ${hallSide === 'bride' ? 'bride-mascot' : 'groom-mascot'}`}><b>{hallSide === 'bride' ? '🦝' : '🦍'}</b><small>{hallSide === 'bride' ? '신부측' : '신랑측'}</small></span>
-              {(hallSide === 'bride' ? [...tables.slice(0, 10), tables[19]] : tables.slice(10, 19)).map((table, offset) => {
-                const index = hallSide === 'bride' ? (offset === 10 ? 19 : offset) : offset + 10;
+              {(hallSide === 'bride' ? brideTableOrder : groomTableOrder).map((index, offset) => {
+                const table = tables[index];
                 const position = hallSide === 'bride' ? BRIDE_TABLE_POSITIONS[offset] : GROOM_TABLE_POSITIONS[offset];
                 return renderTable(table, index, position);
               })}
@@ -368,7 +430,7 @@ export default function Home() {
             {hallSide === 'bride' && <section className="annex-section" aria-label="별도 홀">
               <div className="annex-heading"><h3>별도 홀</h3><span>21–23번 테이블</span></div>
               <div className="annex-hall">
-                {tables.slice(20, 23).map((table, offset) => renderTable(table, offset + 20, ANNEX_TABLE_POSITIONS[offset]))}
+                {annexTableOrder.map((index, offset) => renderTable(tables[index], index, ANNEX_TABLE_POSITIONS[offset]))}
               </div>
             </section>}
           </div>
@@ -376,7 +438,7 @@ export default function Home() {
 
         <aside className="guest-card card">
           <div className="guest-sticky">
-            <div className="table-editor-head"><div><span className="section-label">선택한 테이블</span><h2>{String(selected + 1).padStart(2, '0')}번 테이블</h2></div><div className="capacity-picker" aria-label="테이블 좌석 수">{([8, 9, 10] as const).map((capacity) => <button key={capacity} className={selectedTable.capacity === capacity ? 'active' : ''} onClick={() => setCapacity(capacity)}>{capacity}</button>)}</div></div>
+            <div className="table-editor-head"><div><span className="section-label">선택한 테이블</span><h2>{String(selected + 1).padStart(2, '0')}번 테이블</h2></div><div className="table-editor-controls"><button className={`swap-table-button ${swapSource !== null ? 'active' : ''}`} onClick={toggleSwapMode}>{swapSource !== null ? '바꾸기 취소' : '위치 바꾸기'}</button><div className="capacity-picker" aria-label="테이블 좌석 수">{([8, 9, 10] as const).map((capacity) => <button key={capacity} className={selectedTable.capacity === capacity ? 'active' : ''} onClick={() => setCapacity(capacity)}>{capacity}</button>)}</div></div></div>
             <div className="list-title"><div><h2>전체 하객 명단</h2><p>이름을 누르면 선택한 테이블에 바로 배정됩니다.</p></div><strong>{visibleGuests.length}명</strong></div>
             <label className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 관계 검색" aria-label="하객 검색" /></label>
             <div className="filters">{(['전체', '신부측', '신랑측', '미배정'] as SideFilter[]).map((filter) => <button key={filter} className={sideFilter === filter ? 'active' : ''} onClick={() => setSideFilter(filter)}>{filter}</button>)}<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} aria-label="관계 그룹 필터">{groups.map((group) => <option key={group}>{group}</option>)}</select></div>
