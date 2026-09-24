@@ -17,14 +17,14 @@ const GROUPS = [
 ];
 
 const BRIDE_TABLE_POSITIONS = [
-  [72, 11], [28, 20], [72, 29], [28, 38], [72, 47],
-  [28, 56], [72, 65], [28, 74], [72, 83], [50, 92],
+  [72, 10], [28, 18], [72, 26], [28, 34], [72, 42],
+  [28, 50], [72, 58], [28, 66], [72, 74], [50, 82], [50, 92],
 ];
 const GROOM_TABLE_POSITIONS = [
-  [28, 11], [72, 20], [28, 29], [72, 38], [28, 47],
-  [72, 56], [28, 65], [72, 74], [28, 83], [50, 92],
+  [28, 12], [72, 22], [28, 32], [72, 42], [28, 52],
+  [72, 62], [28, 72], [72, 82], [50, 92],
 ];
-const ANNEX_TABLE_POSITIONS = [[20, 50], [50, 50], [80, 50]];
+const ANNEX_TABLE_POSITIONS = [[50, 27], [72, 73], [28, 73]];
 
 function emptyTables(): TableState[] {
   return Array.from({ length: 23 }, () => ({ capacity: 10, seats: Array(10).fill(null) }));
@@ -302,11 +302,11 @@ export default function Home() {
 
   function switchHall(next: HallSide) {
     setHallSide(next);
-    if (next === 'bride' && selected >= 10 && selected < 20) setSelected(0);
-    if (next === 'groom' && (selected < 10 || selected >= 20)) setSelected(10);
+    if (next === 'bride' && selected >= 10 && selected < 19) setSelected(0);
+    if (next === 'groom' && (selected < 10 || selected >= 19)) setSelected(10);
     setNotice(next === 'bride'
-      ? '신부측 1–10번 테이블과 별도 홀 21–23번을 보고 있어요.'
-      : '신랑측 11–20번 테이블을 보고 있어요.');
+      ? '신부측 1–10번·20번 테이블과 별도 홀 21–23번을 보고 있어요.'
+      : '신랑측 11–19번 테이블을 보고 있어요.');
   }
 
   function applyPastedRoster() {
@@ -324,7 +324,7 @@ export default function Home() {
 
   function renderTable(table: TableState, index: number, position: number[]) {
     const count = table.seats.filter((id) => id !== null).length;
-    const tableTone = index < 10 ? 'bride' : index < 20 ? 'groom' : 'annex';
+    const tableTone = index < 10 || index === 19 ? 'bride' : index < 19 ? 'groom' : 'annex';
     return <div key={index} className={`table-cluster ${tableTone}`} style={{ left: `${position[0]}%`, top: `${position[1]}%` }}>
       {table.seats.slice(0, table.capacity).map((id, seatIndex) => {
         const guest = guests.find((person) => person.id === id);
@@ -353,13 +353,13 @@ export default function Home() {
       <p className="notice" role="status"><span>●</span>{notice}</p>
       <section className="workspace">
         <div className="floor-card card">
-          <div className="card-heading"><div><h2>웨딩홀 배치도</h2><p>{hallSide === 'bride' ? '신부측 1–10번 · 별도 홀 21–23번' : '신랑측 11–20번'} · 테이블당 8–10석</p></div><div className="hall-tabs" role="tablist" aria-label="홀 구역 선택"><button role="tab" aria-selected={hallSide === 'bride'} className={hallSide === 'bride' ? 'active bride' : ''} onClick={() => switchHall('bride')}>🦝 신부측</button><button role="tab" aria-selected={hallSide === 'groom'} className={hallSide === 'groom' ? 'active groom' : ''} onClick={() => switchHall('groom')}>🦍 신랑측</button></div></div>
+          <div className="card-heading"><div><h2>웨딩홀 배치도</h2><p>{hallSide === 'bride' ? '신부측 1–10번·20번 · 별도 홀 21–23번' : '신랑측 11–19번'} · 테이블당 8–10석</p></div><div className="hall-tabs" role="tablist" aria-label="홀 구역 선택"><button role="tab" aria-selected={hallSide === 'bride'} className={hallSide === 'bride' ? 'active bride' : ''} onClick={() => switchHall('bride')}>🦝 신부측</button><button role="tab" aria-selected={hallSide === 'groom'} className={hallSide === 'groom' ? 'active groom' : ''} onClick={() => switchHall('groom')}>🦍 신랑측</button></div></div>
           <div className="hall-wrap">
             <div className={`hall side-hall ${hallSide}`}>
-              <div className="stage"><b>STAGE</b><span>{hallSide === 'bride' ? '신부측 · 1–10번' : '신랑측 · 11–20번'}</span></div>
+              <div className="stage"><b>STAGE</b><span>{hallSide === 'bride' ? '신부측 · 1–10번 / 20번' : '신랑측 · 11–19번'}</span></div>
               <span className={`mascot-label side-mascot ${hallSide === 'bride' ? 'bride-mascot' : 'groom-mascot'}`}><b>{hallSide === 'bride' ? '🦝' : '🦍'}</b><small>{hallSide === 'bride' ? '신부측' : '신랑측'}</small></span>
-              {(hallSide === 'bride' ? tables.slice(0, 10) : tables.slice(10, 20)).map((table, offset) => {
-                const index = hallSide === 'bride' ? offset : offset + 10;
+              {(hallSide === 'bride' ? [...tables.slice(0, 10), tables[19]] : tables.slice(10, 19)).map((table, offset) => {
+                const index = hallSide === 'bride' ? (offset === 10 ? 19 : offset) : offset + 10;
                 const position = hallSide === 'bride' ? BRIDE_TABLE_POSITIONS[offset] : GROOM_TABLE_POSITIONS[offset];
                 return renderTable(table, index, position);
               })}

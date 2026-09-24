@@ -52,7 +52,7 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 .hall-tabs button.active.groom { color:var(--groom-dark); }
 .hall-wrap { padding:22px 12px; overflow-x:auto; background-color:#f7f5f3; background-image:radial-gradient(#d7d2ce .75px,transparent .75px); background-size:15px 15px; }
 .hall { width:100%; min-width:540px; height:1900px; margin:auto; border:2px solid #d4d0cc; border-radius:8px 8px 115px 115px; position:relative; background:rgba(255,255,255,.82); }
-.hall.bride { border-color:#d8c0c9; }
+.hall.bride { height:2100px; border-color:#d8c0c9; }
 .hall.groom { border-color:#c8cbcd; }
 .stage { position:absolute; top:22px; left:14%; width:72%; height:74px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f0eeec; border:1px solid #d7d2ce; z-index:2; }
 .stage b { font-size:16px; font-weight:800; letter-spacing:.2em; }
@@ -89,7 +89,7 @@ h2 { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.035em; }
 .annex-heading { height:56px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; border:1px solid #d4d0cc; border-bottom:0; border-radius:10px 10px 0 0; background:#eee9e5; }
 .annex-heading h3 { margin:0; font-size:14px; font-weight:800; }
 .annex-heading span { color:#8b8179; font-size:11px; font-weight:700; }
-.annex-hall { height:280px; position:relative; border:2px solid #d4d0cc; border-radius:0 0 16px 16px; background:rgba(255,255,255,.86); }
+.annex-hall { height:520px; position:relative; border:2px solid #d4d0cc; border-radius:0 0 16px 16px; background:rgba(255,255,255,.86); }
 .guest-card { max-height:calc(100vh - 100px); position:sticky; top:96px; display:flex; flex-direction:column; }
 .guest-sticky { padding:22px 24px 14px; background:var(--paper); border-bottom:1px solid var(--line); z-index:2; }
 .table-editor-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
